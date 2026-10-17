@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Build a Vega app non interactively. usage: vega-build [project dir] [Release|Debug]
+set -euo pipefail
+source ~/vega/env
+cd "${1:-.}"
+CI=true npx react-native build-kepler --build-type "${2:-Release}" </dev/null
+find build -name '*.vpkg' -newer package.json | sort

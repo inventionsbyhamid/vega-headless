@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+"""Save a full resolution screenshot of the virtual device through the emulator console. usage: vvd-shot [out dir]"""
+import os, socket, sys, time
+out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/vvd-shots"
+os.makedirs(out, exist_ok=True)
+s = socket.create_connection(("127.0.0.1", int(os.environ.get("VVD_CONSOLE_PORT", "5554"))), timeout=10)
+time.sleep(0.5); s.recv(4096)
+token = open(os.path.expanduser("~/.emulator_console_auth_token")).read().strip()
+s.sendall(f"auth {token}\r\n".encode()); time.sleep(0.5); s.recv(4096)
+s.sendall(f"screenrecord screenshot {out}\r\n".encode()); time.sleep(2.5); s.recv(4096)
+print(max((os.path.join(out, f) for f in os.listdir(out)), key=os.path.getmtime))

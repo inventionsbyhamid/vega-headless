@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Record the virtual device screen area. usage: vvd-record <seconds> <out.mp4>
+set -euo pipefail
+read -r X Y W H < <(xwininfo -name "Vega Virtual Device" | awk '/Absolute upper-left X/{x=$4}/Absolute upper-left Y/{y=$4}/Width/{w=$2}/Height/{h=$2}END{print x, y, w, h}')
+W=$(( W - W % 2 )); H=$(( H - H % 2 ))
+ffmpeg -loglevel error -y -f x11grab -video_size "${W}x${H}" -framerate 15 -i ":99.0+${X},${Y}" -t "$1" -pix_fmt yuv420p "$2"
+echo "$2"

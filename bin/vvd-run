@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Install and launch a package on the virtual device. usage: vvd-run <file.vpkg> <app.name.main>
+set -euo pipefail
+source ~/vega/env
+vega device install-app -p "$1" </dev/null
+vega device launch-app -a "$2" </dev/null

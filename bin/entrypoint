@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Give the dev user access to /dev/kvm (its group id differs per host) and start a virtual display.
+set -e
+if [ -e /dev/kvm ]; then
+  gid=$(stat -c %g /dev/kvm)
+  getent group "$gid" >/dev/null || sudo groupadd -g "$gid" kvmhost
+  sudo usermod -aG "$(getent group "$gid" | cut -d: -f1)" dev
+  sudo chmod 666 /dev/kvm
+fi
+if ! pgrep -x Xvfb >/dev/null; then
+  rm -f /tmp/.X99-lock
+  Xvfb :99 -screen 0 1920x1080x24 +extension GLX +render -noreset >/tmp/xvfb.log 2>&1 &
+  sleep 1
+fi
+source ~/vega/env
+exec "$@"

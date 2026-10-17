@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Boot the Vega Virtual Device headless. Software rendering through Mesa keeps the screen visible.
+set -euo pipefail
+source ~/vega/env
+vega virtual-device stop </dev/null >/dev/null 2>&1 || true
+rm -rf ~/vega/sdk/vega-sdk/*/*/vvd/instances/* 2>/dev/null || true
+vega virtual-device start --gui --gl-accel --timeout "${VVD_TIMEOUT:-600}" </dev/null
+vega device list </dev/null

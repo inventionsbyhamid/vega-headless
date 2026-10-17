@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Press remote keys on the virtual device. Keys: Up Down Left Right Return (select) Escape (back) F1 (home) F4 (play/pause)
+# usage: vvd-keys Right Right Return sleep:2 Escape
+W=$(xwininfo -root -tree | grep '"Vega Virtual Device"' | head -1 | awk '{print $1}')
+[ -n "$W" ] || { echo "virtual device window not found" >&2; exit 1; }
+xdotool windowfocus "$W"
+for key in "$@"; do
+  case "$key" in
+    sleep:*) sleep "${key#sleep:}" ;;
+    type:*) xdotool type --window "$W" --delay 80 "${key#type:}" ;;
+    *) xdotool key --window "$W" "$key"; sleep 0.6 ;;
+  esac
+done
