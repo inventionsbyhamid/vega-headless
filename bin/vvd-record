@@ -1,7 +1,24 @@
-#!/usr/bin/env bash
-# Record the virtual device screen area. usage: vvd-record <seconds> <out.mp4>
-set -euo pipefail
-read -r X Y W H < <(xwininfo -name "Vega Virtual Device" | awk '/Absolute upper-left X/{x=$4}/Absolute upper-left Y/{y=$4}/Width/{w=$2}/Height/{h=$2}END{print x, y, w, h}')
-W=$(( W - W % 2 )); H=$(( H - H % 2 ))
-ffmpeg -loglevel error -y -f x11grab -video_size "${W}x${H}" -framerate 15 -i ":99.0+${X},${Y}" -t "$1" -pix_fmt yuv420p "$2"
-echo "$2"
+#!/usr/bin/env python3
+"""Record the virtual device at 1080p with its sound through the emulator's own recorder.
+Grabbing the X display stalls while the device draws, so this asks the emulator instead.
+usage: vvd-record <seconds> <out.webm>"""
+import os, socket, sys, time
+
+seconds, out = float(sys.argv[1]), os.path.abspath(sys.argv[2])
+
+
+def console(command):
+    s = socket.create_connection(("127.0.0.1", int(os.environ.get("VVD_CONSOLE_PORT", "5554"))), timeout=10)
+    time.sleep(0.4); s.recv(4096)
+    token = open(os.path.expanduser("~/.emulator_console_auth_token")).read().strip()
+    s.sendall(f"auth {token}\r\n".encode()); time.sleep(0.4); s.recv(4096)
+    s.sendall(f"{command}\r\n".encode()); time.sleep(0.5)
+    s.recv(4096)
+    s.close()
+
+
+console(f"screenrecord start --time-limit {int(seconds) + 5} {out}")
+time.sleep(seconds)
+console("screenrecord stop")
+time.sleep(3)
+print(out)

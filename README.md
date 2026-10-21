@@ -45,7 +45,7 @@ vega-build apps/vega                        # build your app, prints the .vpkg f
 vvd-run apps/vega/build/x86_64-release/*.vpkg com.example.app.main
 vvd-keys Down Right Return sleep:3          # press remote keys
 vvd-shot                                    # 1920x1080 screenshot, prints the file path
-vvd-record 20 /workspace/run.mp4            # record the screen while you test
+vvd-record 20 /workspace/run.webm           # 1080p, 24 fps, with sound
 ```
 
 Remote keys for `vvd-keys`: `Up`, `Down`, `Left`, `Right`, `Return` (select), `Escape` (back), `F1` (home), `F4` (play and pause). `type:hello` types text into a focused text field.
@@ -53,7 +53,9 @@ Remote keys for `vvd-keys`: `Up`, `Down`, `Left`, `Right`, `Return` (select), `E
 ## Notes
 
 * Media URLs must be https. With plain http the W3C media player fails with `MPB Call failed with code: 50004` even though `fetch` and images work.
-* `vvd-shot` uses the emulator console, so screenshots are full resolution. `vvd-record` captures the emulator window, which is smaller.
+* `vvd-shot` and `vvd-record` use the emulator console, so they are full resolution. Recording with `ffmpeg -f x11grab` on the Xvfb display stalls for seconds at a time while the device draws; the console's `screenrecord` gives smooth 1080p VP9 at 24 fps with the device's sound. It only writes frames when the screen changes, so the file has a variable frame rate.
+* Without a GPU the device draws with Mesa in software. Interfaces run fine, but video plays at about half speed and around 11 frames per second, so judge playback smoothness on a real Fire TV.
+* After several hours the device can stop reacting to keys while the app stays on screen. Restart it with `vvd-start` and reinstall the app.
 * The image installs the latest SDK at build time. Pin a version inside the container with `vega sdk install <version>` and `vega sdk use <version>`.
 
 Built while making [StoryQuest](https://github.com/) for the Amazon Developer hackathon "Build, Ship, Shape". The Vega SDK itself is Amazon's and is downloaded from Amazon at build time; this repository only contains the Dockerfile and scripts.
