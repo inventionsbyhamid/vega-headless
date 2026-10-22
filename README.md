@@ -1,34 +1,34 @@
 # vega-headless
 
-Build Fire TV Vega OS apps and run them in the **Vega Virtual Device on a headless Linux server**, in Docker. No Mac, no Fire TV, no desktop session. Useful for CI, for laptops without 20 GB of free disk, and for teams on Intel Macs, where SDK 0.24 is the last supported version.
+Run Amazon's Vega SDK and the Vega Virtual Device (the Fire TV simulator) inside Docker on a Linux server with no screen. Build your Fire TV app, install it, press remote buttons, take screenshots and record video, all from the command line.
 
-The image wraps the official Vega SDK and fixes the problems we hit running it headless:
+* No Mac and no Fire TV needed
+* Works on a server or in CI
+* Keeps the 20 GB SDK off your laptop
+* Fixes the problems you hit when running the SDK this way (listed below)
 
-| Problem | What happens | Fix in this image |
-| --- | --- | --- |
-| Installer refuses root | "This script must not be run as root" | SDK installed as a regular `dev` user with sudo |
-| Installer needs jq | not in the documented prerequisites | jq preinstalled |
-| Installer prompts read stdin | piped installs fail with EOF | installer runs from a file with default answers |
-| `build-kepler` hangs without a TTY | no output for 10+ minutes | `vega-build` runs with `CI=true` and stdin closed |
-| Device needs IPv6 | boot fails after 600 s with "failed to access shell" | run with IPv6 enabled (see below) |
-| `--no-gl-accel` renders nothing | every screenshot is black | Mesa software OpenGL under Xvfb with GLX |
-| Zombie emulators lock the AVD | "Running multiple emulators with the same AVD" | run with `--init`; `vvd-start` clears old instances |
-| `run-app` cannot find the app | "App could not be determined" | `vvd-run` uses `install-app` and `launch-app` |
+## You need
 
-## Requirements
-
-* Linux x86_64 host with KVM (`ls /dev/kvm`)
+* A Linux x86_64 machine with KVM. Check with `ls /dev/kvm`.
 * Docker
-* About 15 GB of disk for the image
+* About 15 GB of free disk
 
-## Quick start
+## Install
 
 ```bash
+git clone https://github.com/inventionsbyhamid/vega-headless.git
+cd vega-headless
 docker build -t vega-headless .
 
-# The virtual device binds to ::1 with address checks that need an IPv6 address on the container.
+# The virtual device needs IPv6 inside the container.
 docker network create --ipv6 --subnet fd00:5e9a::/64 vega-v6
+```
 
+## Use
+
+Start a container with your app's folder mounted:
+
+```bash
 docker run -it --rm --init \
   --device /dev/kvm \
   --sysctl net.ipv6.conf.all.disable_ipv6=0 \
@@ -37,29 +37,52 @@ docker run -it --rm --init \
   vega-headless bash
 ```
 
-Inside the container:
+Then, inside the container:
+
+| Command | What it does |
+| --- | --- |
+| `vvd-start` | Starts the virtual device (about 10 seconds) |
+| `vega-build apps/vega` | Builds your app and prints the `.vpkg` files |
+| `vvd-run <file.vpkg> <app id>` | Installs and opens your app |
+| `vvd-keys Down Right Return sleep:3` | Presses remote buttons |
+| `vvd-shot` | Saves a 1920x1080 screenshot and prints its path |
+| `vvd-record 20 /workspace/run.webm` | Records 20 seconds of 1080p video with sound |
+
+Example:
 
 ```bash
-vvd-start                                   # boot the Vega Virtual Device (about 10 s with KVM)
-vega-build apps/vega                        # build your app, prints the .vpkg files
+vvd-start
+vega-build apps/vega
 vvd-run apps/vega/build/x86_64-release/*.vpkg com.example.app.main
-vvd-keys Down Right Return sleep:3          # press remote keys
-vvd-shot                                    # 1920x1080 screenshot, prints the file path
-vvd-record 20 /workspace/run.webm           # 1080p, 24 fps, with sound
+vvd-keys Right Return sleep:2
+vvd-shot
 ```
 
-Remote keys for `vvd-keys`: `Up`, `Down`, `Left`, `Right`, `Return` (select), `Escape` (back), `F1` (home), `F4` (play and pause). `type:hello` types text into a focused text field.
+Remote buttons for `vvd-keys`: `Up`, `Down`, `Left`, `Right`, `Return` (select), `Escape` (back), `F1` (home), `F4` (play and pause). `type:hello` types text into a text field. `sleep:2` waits two seconds.
 
-## Notes
+## Problems it fixes
 
-* Media URLs must be https. With plain http the W3C media player fails with `MPB Call failed with code: 50004` even though `fetch` and images work.
-* `vvd-shot` and `vvd-record` use the emulator console, so they are full resolution. Recording with `ffmpeg -f x11grab` on the Xvfb display stalls for seconds at a time while the device draws; the console's `screenrecord` gives smooth 1080p VP9 at 24 fps with the device's sound. It only writes frames when the screen changes, so the file has a variable frame rate.
-* Without a GPU the device draws with Mesa in software. Interfaces run fine, but video plays at about half speed and around 11 frames per second, so judge playback smoothness on a real Fire TV.
-* After several hours the device can stop reacting to keys while the app stays on screen. Restart it with `vvd-start` and reinstall the app.
-* The image installs the latest SDK at build time. Pin a version inside the container with `vega sdk install <version>` and `vega sdk use <version>`.
+| Problem | Fix |
+| --- | --- |
+| The SDK installer refuses to run as root | Installs as a normal `dev` user |
+| The installer needs `jq`, which the docs don't list | Comes installed |
+| The installer fails when its questions come from a pipe | Runs from a file with the default answers |
+| App builds hang with no output when there is no terminal | `vega-build` runs them in CI mode |
+| The device fails to boot after 10 minutes without IPv6 | The `docker run` command above turns IPv6 on |
+| Screenshots are black without a graphics card | Draws in software with Mesa on a virtual screen |
+| A stuck old emulator blocks the new one | Run with `--init`; `vvd-start` clears old instances |
+| `vega device run-app` can't find the app | `vvd-run` installs and launches by app id |
 
-Built while making [StoryQuest](https://github.com/) for the Amazon Developer hackathon "Build, Ship, Shape". The Vega SDK itself is Amazon's and is downloaded from Amazon at build time; this repository only contains the Dockerfile and scripts.
+## Good to know
+
+* Video must come from https addresses. Plain http fails in the player with error 50004, even though images and `fetch` work.
+* Without a graphics card the device draws everything in software. Menus work, but video plays at about half speed and animations at about 10 frames a second. Check smoothness on a real Fire TV.
+* `vvd-record` uses the emulator's own recorder, which is smooth at 24 frames a second. It skips frames when nothing changes and drops sound during silence. When you edit a recording with ffmpeg, add `-af aresample=async=1` to keep sound in sync.
+* After many hours the device can stop reacting to buttons. Run `vvd-start` again and reinstall your app.
+* The image installs the newest SDK when you build it. To pin a version, run `vega sdk install <version>` and `vega sdk use <version>` inside the container.
+
+Made while building [StoryQuest](https://github.com/inventionsbyhamid/storyquest) for the Amazon Developer hackathon "Build, Ship, Shape". The Vega SDK belongs to Amazon and is downloaded from Amazon when you build the image. This repository only holds the Dockerfile and scripts.
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE).
